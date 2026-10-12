@@ -28,6 +28,9 @@ dev = [
     "nbstripout>=0.7",
 ]
 
+[project.scripts]
+ohlcv-fetch = "ohlcv_lab.fetch:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
