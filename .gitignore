@@ -16,6 +16,9 @@ dist/
 
 # Jupyter
 .ipynb_checkpoints/
+.virtual_documents/
+anaconda_projects/
+notebooks/scratch_*.ipynb
 
 # IDE / OS
 .idea/
