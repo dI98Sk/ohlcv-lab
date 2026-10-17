@@ -81,6 +81,25 @@ ohlcv-stats --interval 1   # минутные
 Движений больше 4σ у BTC 220 из 26 723 часов, нормальная модель ожидает 1.7.
 Корреляции часовых доходностей 0.63–0.82.
 
+## SQL (DuckDB)
+
+```bash
+ohlcv-sql summary                       # статистики по монетам
+ohlcv-sql resample --bucket "4 hours"   # 1h -> 4h свечи
+ohlcv-sql -e "SELECT symbol, count(*) FROM candles GROUP BY ALL"
+```
+
+DuckDB читает Parquet напрямую, без загрузки в pandas. Представления: `candles`
+(чистый слой, `symbol` и `interval` берутся из пути), `returns`, `drawdowns`.
+Готовые запросы лежат в `src/ohlcv_lab/queries/`: `rolling_vol`, `resample`,
+`gaps`, `summary`, `correlation`. Каждый тестами сверяется с pandas-версией из
+`stats.py` или `clean.py`.
+
+- `TimeZone = 'UTC'` при подключении: иначе `date_trunc('day')` режет сутки по
+  локальному времени машины;
+- типы партиций заданы явно (`VARCHAR`): иначе `interval=60` становится числом;
+- `WHERE symbol = 'BTCUSDT'` читает 1 файл из 6 (partition pruning).
+
 ## Структура
 
 ```

@@ -32,9 +32,13 @@ dev = [
 ohlcv-fetch = "ohlcv_lab.fetch:main"
 ohlcv-clean = "ohlcv_lab.clean:main"
 ohlcv-stats = "ohlcv_lab.stats:main"
+ohlcv-sql = "ohlcv_lab.sql:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+ohlcv_lab = ["queries/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
