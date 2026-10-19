@@ -7,49 +7,6 @@ import pytest
 from ohlcv_lab.clean import gap_ranges
 from ohlcv_lab.sql import connect, default_params, main, query, run_sql
 from ohlcv_lab.stats import drawdown, log_returns, rolling_vol, summary
-from ohlcv_lab.storage import save_clean
-
-HOURS = 24 * 70
-
-
-def candles(start, n, freq="h", seed=0, gap=None):
-    """A clean-layer frame: random walk, complete grid, optional NaN gap (a slice)."""
-    rng = np.random.default_rng(seed)
-    index = pd.date_range(start, periods=n, freq=freq, tz="UTC", name="open_time").as_unit("ms")
-    close = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, n)))
-    open_ = np.r_[100, close[:-1]]
-    df = pd.DataFrame(
-        {
-            "open": open_,
-            "high": np.maximum(open_, close) * 1.002,
-            "low": np.minimum(open_, close) * 0.998,
-            "close": close,
-            "volume": rng.uniform(1, 10, n),
-            "turnover": rng.uniform(100, 1000, n),
-        },
-        index=index,
-    )
-    if gap is not None:
-        df.iloc[gap] = np.nan
-    df["is_gap"] = df["close"].isna()
-    df["bad_ohlc"] = False
-    df["is_extreme"] = False
-    return df
-
-
-@pytest.fixture(scope="module")
-def layer(tmp_path_factory):
-    """Two hourly series (one listed later, one with a gap) and a daily one."""
-    root = tmp_path_factory.mktemp("clean")
-    frames = {
-        "AAAUSDT": candles("2024-01-01", HOURS, seed=1),
-        "BBBUSDT": candles("2024-01-11", HOURS - 240, seed=2, gap=slice(500, 503)),
-    }
-    for symbol, df in frames.items():
-        save_clean(df, root, symbol, "60")
-    save_clean(candles("2024-01-01", 70, freq="D", seed=3), root, "AAAUSDT", "D")
-    closes = pd.concat({s: df["close"] for s, df in frames.items()}, axis=1)
-    return root, frames, closes
 
 
 @pytest.fixture
@@ -141,11 +98,12 @@ def test_summary_matches_pandas(con, layer):
 
 
 def test_correlation_matches_pandas(con, layer):
-    _, _, closes = layer
+    _, frames, closes = layer
     got = query(con, "correlation").iloc[0]
     expected = closes.apply(log_returns).corr().loc["AAAUSDT", "BBBUSDT"]
     assert got["corr"] == pytest.approx(expected, rel=1e-12)
-    assert got["n"] == HOURS - 240 - 1 - 4  # overlap minus first return minus the gap's four
+    # overlap minus the first return minus the gap's four
+    assert got["n"] == len(frames["BBBUSDT"]) - 1 - 4
 
 
 def test_extra_params_are_not_passed(con):
@@ -161,3 +119,10 @@ def test_cli_runs_named_and_inline_queries(layer, capsys, tmp_path):
     assert main(["-e", "SELECT count(*) AS n FROM candles", "--clean-dir", str(root)]) == 0
     with pytest.raises(SystemExit):
         main(["--clean-dir", str(root)])  # neither a name nor -e
+
+
+def test_connect_can_narrow_to_one_symbol(layer):
+    con = connect(layer[0], "AAAUSDT")
+    assert run_sql(con, "SELECT DISTINCT symbol FROM candles")["symbol"].tolist() == ["AAAUSDT"]
+    with pytest.raises(ValueError):
+        connect(layer[0], "x' OR '1'='1")  # goes into SQL text, so it is validated
