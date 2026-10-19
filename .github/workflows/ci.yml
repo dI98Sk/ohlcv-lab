@@ -1,0 +1,33 @@
+# Lint and tests on every push and PR. Tests use synthetic data only: the CI
+# never calls the Bybit API (network, rate limits, and the data/ layer is not in git).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the exact environment from requirements.lock
+          - python: "3.12"
+            install: pip install -r requirements.lock && pip install -e . --no-deps
+          # the oldest supported Python with whatever versions pyproject.toml allows
+          - python: "3.11"
+            install: pip install -e ".[dev]"
+    name: python ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: ${{ matrix.install }}
+      - run: ruff check src tests notebooks/report.ipynb
+      - run: ruff format --check src tests notebooks/report.ipynb
+      - run: pytest -q
