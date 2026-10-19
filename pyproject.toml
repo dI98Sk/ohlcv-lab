@@ -34,6 +34,7 @@ ohlcv-clean = "ohlcv_lab.clean:main"
 ohlcv-stats = "ohlcv_lab.stats:main"
 ohlcv-sql = "ohlcv_lab.sql:main"
 ohlcv-bench = "ohlcv_lab.bench:main"
+ohlcv-report = "ohlcv_lab.report:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
