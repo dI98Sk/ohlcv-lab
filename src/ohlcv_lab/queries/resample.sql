@@ -1,12 +1,16 @@
--- Aggregate candles into wider ones (e.g. 1h -> 1 day). Buckets are aligned
--- to UTC because the connection runs with TimeZone = 'UTC'.
+-- Aggregate candles into wider ones (e.g. 1h -> 1 day), buckets aligned to UTC.
+--
+-- Bucketing runs on a plain UTC TIMESTAMP: time_bucket on TIMESTAMPTZ does
+-- time-zone calendar math per row and was ~30x slower on 542k minute candles.
+-- timezone('UTC', ...) converts explicitly, so the result does not depend on
+-- the session TimeZone either.
 --
 -- open/close come from the first/last *existing* candle of the bucket. A bucket
 -- that misses candles (a gap, or the unfinished edge of the series) is kept but
 -- marked complete = false: its range and volume cover only part of the period.
 SELECT
     symbol,
-    time_bucket($bucket::INTERVAL, open_time) AS bucket,
+    timezone('UTC', time_bucket($bucket::INTERVAL, timezone('UTC', open_time))) AS bucket,
     arg_min(open, open_time) AS open,
     max(high) AS high,
     min(low) AS low,

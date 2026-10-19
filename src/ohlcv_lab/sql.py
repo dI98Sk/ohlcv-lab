@@ -64,11 +64,17 @@ FROM candles;
 """
 
 
-def connect(clean_dir: Path = DEFAULT_CLEAN_DIR) -> duckdb.DuckDBPyConnection:
-    """In-memory DuckDB with the ``candles``, ``returns`` and ``drawdowns`` views."""
+def connect(clean_dir: Path = DEFAULT_CLEAN_DIR, symbol: str = "*") -> duckdb.DuckDBPyConnection:
+    """In-memory DuckDB with the ``candles``, ``returns`` and ``drawdowns`` views.
+
+    ``symbol`` narrows the file glob, so other symbols' files are never opened.
+    """
+    if not re.fullmatch(r"[A-Z0-9]+|\*", symbol):
+        raise ValueError(f"bad symbol {symbol!r}")  # it goes into SQL text, not a parameter
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
-    pattern = (Path(clean_dir) / "*" / "*" / "data.parquet").as_posix().replace("'", "''")
+    files = Path(clean_dir) / f"symbol={symbol}" / "*" / "data.parquet"
+    pattern = files.as_posix().replace("'", "''")
     con.execute(f"""
         CREATE VIEW candles AS
         SELECT * FROM read_parquet(
